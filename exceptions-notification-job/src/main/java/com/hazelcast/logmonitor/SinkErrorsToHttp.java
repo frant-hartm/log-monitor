@@ -10,10 +10,14 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.time.Duration;
+import java.util.UUID;
 
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.HazelcastJsonValue;
+import com.hazelcast.internal.json.Json;
 import com.hazelcast.internal.json.JsonObject;
+import com.hazelcast.internal.json.JsonValue;
 import com.hazelcast.jet.JetService;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.pipeline.Pipeline;
@@ -25,8 +29,8 @@ import com.hazelcast.jet.pipeline.StreamSource;
 public class SinkErrorsToHttp {
 
     public static void main(String[] args) {
-        StreamSource<JsonObject> src = Sources.<JsonObject, Long, JsonObject> mapJournal("logs", START_FROM_OLDEST,
-                mapEventNewValue(), mapPutEvents());
+        StreamSource<HazelcastJsonValue> src = Sources.<HazelcastJsonValue, String, HazelcastJsonValue> mapJournal("logs",
+                START_FROM_OLDEST, mapEventNewValue(), mapPutEvents());
         Sink<String> httpSink = SinkBuilder
                 .sinkBuilder("httpSink", ctx -> ctx.hazelcastInstance().<String, String> getMap("_config.httpSink"))
                 .<String> receiveFn((configMap, item) -> {
@@ -36,16 +40,20 @@ public class SinkErrorsToHttp {
                     HttpClient.newHttpClient().send(request, BodyHandlers.discarding());
                 }).build();
         Pipeline pipeline = Pipeline.create();
-        pipeline.readFrom(src).withoutTimestamps().filter(j -> {
-            String strLevel = j.get("level").asString();
-            return strLevel == null || "ERROR".equalsIgnoreCase(strLevel) || "WARNING".equalsIgnoreCase(strLevel);
-        }).map(j -> j.get("message").asString()).writeTo(httpSink);
+        pipeline.readFrom(src).withoutTimestamps().map(jstr -> Json.parse(jstr.toString()))
+                .map(jv -> (jv instanceof JsonObject) ? (JsonObject) jv : (JsonObject) null).filter(jo -> {
+                    if (jo == null) {
+                        return false;
+                    }
+                    String strLevel = jo.get("level").asString();
+                    return strLevel == null || "ERROR".equalsIgnoreCase(strLevel);
+                }).map(j -> j.get("message").asString()).writeTo(httpSink);
 
         HazelcastInstance hz = Hazelcast.bootstrappedInstance();
         JetService jet = hz.getJet();
         JobConfig config = new JobConfig();
         config.setName("logs-processor");
-//        config.setProcessingGuarantee(ProcessingGuarantee.EXACTLY_ONCE);
+        // config.setProcessingGuarantee(ProcessingGuarantee.EXACTLY_ONCE);
         jet.newJobIfAbsent(pipeline, config).join();
     }
 }
