@@ -52,7 +52,7 @@ public class SinkErrorsToHttp {
         Pipeline pipeline = Pipeline.create();
 
         pipeline.readFrom(src)
-                .withoutTimestamps()
+                .withIngestionTimestamps()
                 .map(jstr -> {
                     System.out.println(">>> " + jstr);
                     return Json.parse(jstr.toString());
