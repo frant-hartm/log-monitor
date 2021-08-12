@@ -15,13 +15,18 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.HazelcastJsonValue;
 import com.hazelcast.internal.json.Json;
+import com.hazelcast.internal.server.tcp.ServerSocketRegistry.Pair;
 import com.hazelcast.jet.JetService;
+import com.hazelcast.jet.aggregate.AggregateOperations;
 import com.hazelcast.jet.config.JobConfig;
+import com.hazelcast.jet.contrib.http.HttpListenerSinks;
+import com.hazelcast.jet.datamodel.KeyedWindowResult;
 import com.hazelcast.jet.pipeline.Pipeline;
 import com.hazelcast.jet.pipeline.Sink;
 import com.hazelcast.jet.pipeline.SinkBuilder;
 import com.hazelcast.jet.pipeline.Sources;
 import com.hazelcast.jet.pipeline.StreamSource;
+import com.hazelcast.jet.pipeline.WindowDefinition;
 
 public class SinkErrorsToHttp {
 
@@ -57,6 +62,14 @@ public class SinkErrorsToHttp {
                 .map(jv -> jv.asObject())
                 .filter(jo -> "ERROR".equals(jo.get("level").asString()))
                 .map(j -> j.get("message").asString())
+
+                // basically SELECT message,SUM(*) as count FROM ... WHERE count > 3 GROUP BY message
+                .window(WindowDefinition.sliding(60_000, 1_000))// 1 minute window, moving every 1 second
+                .groupingKey(message -> message)// group by message
+                .aggregate(AggregateOperations.counting())// count
+                .filter(pair -> pair.getValue() > 3)
+
+                .map(KeyedWindowResult::toString)// change to something nicer
                 .writeTo(httpSink);
 
         HazelcastInstance hz = Hazelcast.bootstrappedInstance();
