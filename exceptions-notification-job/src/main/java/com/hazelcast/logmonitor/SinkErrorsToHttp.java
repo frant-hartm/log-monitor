@@ -55,18 +55,19 @@ public class SinkErrorsToHttp {
                 .withIngestionTimestamps()
                 .map(jstr -> {
                     System.out.println(">>> " + jstr);
-                    return Json.parse(jstr.toString());
+                    return Json.parse(jstr.toString()).asObject();
                 })
-                .map(jv -> jv.asObject())
-                .filter(jo -> "ERROR".equals(jo.get("level").asString()))
-                .map(j -> j.get("message").asString())
+                .filter(jo -> {
+                    String lvl = jo.get("level").asString();
+                    return ("ERROR".equals(lvl) || "SEVERE".equals(lvl)) && !jo.get("stacktrace").isNull();
+                })
+                .map(j -> j.get("stacktrace").asString())
 
-                // basically SELECT message,SUM(*) as count FROM ... WHERE count > 3 GROUP BY message
+                // basically SELECT message,SUM(*) as count FROM ... WHERE count > 3 GROUP BY stacktrace
                 .window(WindowDefinition.sliding(60_000, 1_000))// 1 minute window, moving every 1 second
-                .groupingKey(message -> message)// group by message
+                .groupingKey(stacktrace -> stacktrace)// group by stacktrace
                 .aggregate(AggregateOperations.counting())// count
                 .filter(pair -> pair.getValue() > 3)
-
                 .map(KeyedWindowResult::toString)// change to something nicer
                 .writeTo(httpSink);
 
