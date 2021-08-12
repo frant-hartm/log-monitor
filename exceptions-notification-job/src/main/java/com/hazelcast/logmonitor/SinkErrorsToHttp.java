@@ -39,7 +39,7 @@ public class SinkErrorsToHttp {
         Sink<String> httpSink = SinkBuilder
                 .sinkBuilder("httpSink", ctx -> ctx.hazelcastInstance().<String, String>getMap("_config.httpSink"))
                 .<String>receiveFn((configMap, item) -> {
-                    String url = configMap.getOrDefault("url", "http://127.0.0.1:8080/warning4");
+                    String url = configMap.getOrDefault("url", "http://127.0.0.1:8085/warning4");
                     HttpRequest request = HttpRequest.newBuilder()
                                                      .uri(URI.create(url))
                                                      .timeout(Duration.ofSeconds(3))

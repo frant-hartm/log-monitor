@@ -26,7 +26,7 @@ import com.sun.net.httpserver.HttpServer;
 @SuppressWarnings("restriction")
 public class Notifier implements HttpHandler {
 
-    public static final int DEFAULT_PORT = 8080;
+    public static final int DEFAULT_PORT = 8085;
     public static final String DEFAULT_SOUND_PROP = "win.sound.asterisk";
     public static final String DEFAULT_ICON = "sun";
 
@@ -72,7 +72,13 @@ public class Notifier implements HttpHandler {
                 + "\n- click to remove events" //
                 + "\n- double-click to exit");
         this.icon.setImageAutoSize(true);
-        this.icon.addMouseListener(new MouseAdapter() {
+        TrayIcon finalIcon = icon;
+        String finalDefaultIcon = defaultIcon;
+        this.icon.addMouseListener(createMouseAdapter(finalIcon, finalDefaultIcon));
+    }
+
+    private MouseAdapter createMouseAdapter(TrayIcon icon, String defaultIcon) {
+        return new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) {
@@ -85,7 +91,7 @@ public class Notifier implements HttpHandler {
                 }
                 super.mouseClicked(e);
             }
-        });
+        };
     }
 
     /**
@@ -198,7 +204,7 @@ public class Notifier implements HttpHandler {
      * @param name image name
      * @return PNG Image with given name or null if no such image exist.
      */
-    private Image getImage(final String name) {
+    Image getImage(final String name) {
         if (name == null)
             return null;
         final URL url = getClass().getResource(name.replaceAll("^/*", "") + ".png");
