@@ -25,7 +25,7 @@ public class LogListenerJob {
         Pipeline p = Pipeline.create();
 
         var source = HttpListenerSources.httpListener(
-                8080,
+                8082,
                 bytes -> new String(bytes, UTF_8)
         );
 
