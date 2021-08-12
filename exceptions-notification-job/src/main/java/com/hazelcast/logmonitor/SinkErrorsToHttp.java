@@ -26,20 +26,37 @@ import com.hazelcast.jet.pipeline.StreamSource;
 public class SinkErrorsToHttp {
 
     public static void main(String[] args) {
-        StreamSource<HazelcastJsonValue> src = Sources.<HazelcastJsonValue, String, HazelcastJsonValue> mapJournal("logs",
-                START_FROM_OLDEST, mapEventNewValue(), mapPutEvents());
+        StreamSource<HazelcastJsonValue> src = Sources.<HazelcastJsonValue, String, HazelcastJsonValue>mapJournal(
+                "logs",
+                START_FROM_OLDEST,
+                mapEventNewValue(),
+                mapPutEvents()
+        );
+
         Sink<String> httpSink = SinkBuilder
-                .sinkBuilder("httpSink", ctx -> ctx.hazelcastInstance().<String, String> getMap("_config.httpSink"))
-                .<String> receiveFn((configMap, item) -> {
+                .sinkBuilder("httpSink", ctx -> ctx.hazelcastInstance().<String, String>getMap("_config.httpSink"))
+                .<String>receiveFn((configMap, item) -> {
                     String url = configMap.getOrDefault("url", "http://127.0.0.1:8080/warning4");
-                    HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).timeout(Duration.ofSeconds(3))
-                            .POST(BodyPublishers.ofString(item)).build();
+                    HttpRequest request = HttpRequest.newBuilder()
+                                                     .uri(URI.create(url))
+                                                     .timeout(Duration.ofSeconds(3))
+                                                     .POST(BodyPublishers.ofString(item))
+                                                     .build();
+
                     HttpClient.newHttpClient().send(request, BodyHandlers.discarding());
                 }).build();
+
         Pipeline pipeline = Pipeline.create();
-        pipeline.readFrom(src).withoutTimestamps().map(jstr -> {System.out.println(">>> " + jstr);
-            return Json.parse(jstr.toString());}).map(jv -> jv.asObject())
-                .filter(jo -> "ERROR".equals(jo.get("level").asString())).map(j -> j.get("message").asString())
+
+        pipeline.readFrom(src)
+                .withoutTimestamps()
+                .map(jstr -> {
+                    System.out.println(">>> " + jstr);
+                    return Json.parse(jstr.toString());
+                })
+                .map(jv -> jv.asObject())
+                .filter(jo -> "ERROR".equals(jo.get("level").asString()))
+                .map(j -> j.get("message").asString())
                 .writeTo(httpSink);
 
         HazelcastInstance hz = Hazelcast.bootstrappedInstance();
