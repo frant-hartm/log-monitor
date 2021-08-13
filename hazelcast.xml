@@ -22,7 +22,7 @@
         <!--
         <time-to-live-seconds>0</time-to-live-seconds>
         -->
-        <eviction eviction-policy="LRU" max-size-policy="PER_NODE" size="10000"/>
+        <eviction eviction-policy="LRU" size="10000"/>
     </map>
 
     <jet enabled="true" resource-upload-enabled="true"/>

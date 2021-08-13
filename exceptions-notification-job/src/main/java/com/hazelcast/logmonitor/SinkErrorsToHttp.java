@@ -15,6 +15,7 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.HazelcastJsonValue;
 import com.hazelcast.internal.json.Json;
+import com.hazelcast.internal.json.JsonObject;
 import com.hazelcast.jet.JetService;
 import com.hazelcast.jet.aggregate.AggregateOperations;
 import com.hazelcast.jet.config.JobConfig;
@@ -39,27 +40,46 @@ public class SinkErrorsToHttp {
         Sink<String> httpSink = SinkBuilder
                 .sinkBuilder("httpSink", ctx -> ctx.hazelcastInstance().<String, String>getMap("_config.httpSink"))
                 .<String>receiveFn((configMap, item) -> {
-                    String url = configMap.getOrDefault("url", "http://172.128.0.1:8085/warning4");
-                    HttpRequest request = HttpRequest.newBuilder()
-                                                     .uri(URI.create(url))
-                                                     .timeout(Duration.ofSeconds(3))
-                                                     .POST(BodyPublishers.ofString(item))
-                                                     .build();
-
-                    HttpClient.newHttpClient().send(request, BodyHandlers.discarding());
+                    try {
+                        String url = configMap.getOrDefault("url", "http://172.128.0.1:8085/warning4");
+                        System.out.println(">>> Firing event to URL: " + url);
+                        HttpRequest request = HttpRequest.newBuilder()
+                                                         .uri(URI.create(url))
+                                                         .timeout(Duration.ofSeconds(3))
+                                                         .POST(BodyPublishers.ofString(item))
+                                                         .build();
+                        
+                        HttpClient.newHttpClient().send(request, BodyHandlers.discarding());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }).build();
 
         Pipeline pipeline = Pipeline.create();
 
         pipeline.readFrom(src)
                 .withIngestionTimestamps()
-                .map(jstr -> Json.parse(jstr.toString()).asObject())
+                .map(jstr -> {
+                    String msg = jstr.toString();
+                    System.out.println(">>> Message size: " + msg.length());
+                    try {
+                        JsonObject jsObj = Json.parse(msg).asObject();
+                        return jsObj;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    return null;
+                })
+                .filter(jo -> jo != null && !jo.isNull())
                 .filter(jo -> {
                     String lvl = jo.get("level").asString();
-                    return ("ERROR".equals(lvl) || "SEVERE".equals(lvl)) && ! (jo.get("stackTrace").isNull() && jo.get("stacktrace").isNull());
+                    System.out.println(">>> Filter level " + lvl);
+                    boolean stacktraceIsNull = jo.get("stackTrace")!=null && jo.get("stacktrace")!=null;
+                    System.out.println(">>> stacktrace null? " + stacktraceIsNull);
+                    return ("ERROR".equals(lvl) || "SEVERE".equals(lvl)) && ! stacktraceIsNull;
                 })
                 .map(j -> {
-                    String msg = (j.get("stackTrace").isNull()?j.get("stacktrace"):j.get("stackTrace")).asString();
+                    String msg = (j.get("stackTrace")==null?j.get("stacktrace"):j.get("stackTrace")).asString();
                     System.out.println(">>> " + msg.substring(0, 30));
                     return msg;
                 })
