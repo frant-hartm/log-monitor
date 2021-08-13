@@ -1,5 +1,5 @@
-# embed-server
+embed-server
 /subsystem=logging/json-formatter=JSON:add(exception-output-type=formatted)
 /subsystem=logging/file-handler=JSONFILE:add(file={"relative-to" => "jboss.server.log.dir","path" => "server.json"}, named-formatter=JSON)
 /subsystem=logging/root-logger=ROOT:add-handler(name=JSONFILE)
-# stop-embedded-server
+stop-embedded-server

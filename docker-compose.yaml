@@ -26,3 +26,16 @@ services:
     depends_on:
       hz:
        condition: service_started
+  wildfly:
+    image: jboss/wildfly:23.0.2.Final
+    command: ["/mnt/startup.sh"]
+    volumes:
+      - ./ejb-timer/target/ejb-exception-timer.jar:/opt/jboss/wildfly/standalone/deployments/ejb-exception-timer.jar
+      - ./ejb-timer/json-file-logger.cli:/mnt/json-file-logger.cli
+      - ./ejb-timer/startup.sh:/mnt/startup.sh
+    networks:
+      log-monitor-demo:
+        ipv4_address: 172.128.0.4
+    depends_on:
+      hz-deploy:
+       condition: service_completed_successfully

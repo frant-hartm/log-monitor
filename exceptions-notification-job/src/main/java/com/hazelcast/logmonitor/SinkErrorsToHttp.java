@@ -39,7 +39,7 @@ public class SinkErrorsToHttp {
         Sink<String> httpSink = SinkBuilder
                 .sinkBuilder("httpSink", ctx -> ctx.hazelcastInstance().<String, String>getMap("_config.httpSink"))
                 .<String>receiveFn((configMap, item) -> {
-                    String url = configMap.getOrDefault("url", "http://127.0.0.1:8085/warning4");
+                    String url = configMap.getOrDefault("url", "http://172.128.0.1:8085/warning4");
                     HttpRequest request = HttpRequest.newBuilder()
                                                      .uri(URI.create(url))
                                                      .timeout(Duration.ofSeconds(3))
@@ -53,15 +53,16 @@ public class SinkErrorsToHttp {
 
         pipeline.readFrom(src)
                 .withIngestionTimestamps()
-                .map(jstr -> {
-                    System.out.println(">>> " + jstr);
-                    return Json.parse(jstr.toString()).asObject();
-                })
+                .map(jstr -> Json.parse(jstr.toString()).asObject())
                 .filter(jo -> {
                     String lvl = jo.get("level").asString();
-                    return ("ERROR".equals(lvl) || "SEVERE".equals(lvl)) && !jo.get("stacktrace").isNull();
+                    return ("ERROR".equals(lvl) || "SEVERE".equals(lvl)) && ! (jo.get("stackTrace").isNull() && jo.get("stacktrace").isNull());
                 })
-                .map(j -> j.get("stacktrace").asString())
+                .map(j -> {
+                    String msg = (j.get("stackTrace").isNull()?j.get("stacktrace"):j.get("stackTrace")).asString();
+                    System.out.println(">>> " + msg.substring(0, 30));
+                    return msg;
+                })
 
                 // basically SELECT message,SUM(*) as count FROM ... WHERE count > 3 GROUP BY stacktrace
                 .window(WindowDefinition.sliding(60_000, 1_000))// 1 minute window, moving every 1 second
