@@ -76,6 +76,6 @@ public class SinkErrorsToHttp {
         JobConfig config = new JobConfig();
         config.setName("logs-processor");
         // config.setProcessingGuarantee(ProcessingGuarantee.EXACTLY_ONCE);
-        jet.newJobIfAbsent(pipeline, config).join();
+        jet.newJobIfAbsent(pipeline, config);
     }
 }

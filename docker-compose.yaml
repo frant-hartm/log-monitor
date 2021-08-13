@@ -1,0 +1,28 @@
+version: '2.3'
+networks:
+  log-monitor-demo:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.128.0.0/16
+          gateway: 172.128.0.1
+services:
+  hz:
+    image: hazelcast/hazelcast:5.0-BETA-2-slim
+    volumes:
+      - ./hazelcast.xml:/opt/hazelcast/config/hazelcast.xml
+    networks:
+      log-monitor-demo:
+        ipv4_address: 172.128.0.2
+  hz-deploy:
+    image: hazelcast/hazelcast:5.0-BETA-2-slim
+    command: ["/bin/sh", "-c", "sleep 10; /opt/hazelcast/bin/hz-cli submit -t 172.128.0.2 /mnt/log-monitor-job.jar && /opt/hazelcast/bin/hz-cli submit -t 172.128.0.2 /mnt/exception-notification-job.jar"]
+    volumes:
+      - ./log-monitor-job/target/log-monitor-job.jar:/mnt/log-monitor-job.jar
+      - ./exceptions-notification-job/target/exception-notification-job.jar:/mnt/exception-notification-job.jar
+    networks:
+      log-monitor-demo:
+        ipv4_address: 172.128.0.3
+    depends_on:
+      hz:
+       condition: service_started

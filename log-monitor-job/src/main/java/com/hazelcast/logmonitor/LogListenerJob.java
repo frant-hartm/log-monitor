@@ -38,6 +38,6 @@ public class LogListenerJob {
         items.writeTo(Sinks.logger());
         items.writeTo(Sinks.map("logs", v -> UUID.randomUUID().toString(), v -> v));
 
-        jet.newJob(p).join();
+        jet.newJob(p);
     }
 }
