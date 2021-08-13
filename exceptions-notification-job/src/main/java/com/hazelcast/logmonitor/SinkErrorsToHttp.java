@@ -85,7 +85,7 @@ public class SinkErrorsToHttp {
                 })
 
                 // basically SELECT message,SUM(*) as count FROM ... WHERE count > 3 GROUP BY stacktrace
-                .window(WindowDefinition.sliding(60_000, 10_000))// 1 minute window, moving every 10 seconds
+                .window(WindowDefinition.sliding(60_000, 5_000))// x second window, moving every y seconds
                 .groupingKey(stacktrace -> stacktrace)// group by stacktrace
                 .aggregate(AggregateOperations.counting())// count
                 .filter(pair -> pair.getValue() > 3)
